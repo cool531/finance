@@ -1,118 +1,132 @@
+import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'finance_provider.dart';
-import 'appcolors.dart';
 
-class CategoryDonutChart extends StatelessWidget {
-  final List<CategorySpend> data;
-  final double totalExpense;
+import 'AppColors.dart';
+import 'Model.dart';
 
-  const CategoryDonutChart({
+/// A hand-drawn donut chart — no chart package needed. Segment sizes are
+/// proportional to the values, and the ring sweeps in when the data changes.
+class DonutChart extends StatelessWidget {
+  final Map<ExpenseCategory, double> data;
+  final double size;
+  final double strokeWidth;
+  final Widget? center;
+
+  const DonutChart({
     super.key,
     required this.data,
-    required this.totalExpense,
+    this.size = 160,
+    this.strokeWidth = 24,
+    this.center,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (data.isEmpty) {
-      return const SizedBox(
-        height: 140,
-        child: Center(
-          child: Text(
-            'ยังไม่มีรายจ่ายในเดือนนี้',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 850),
+      curve: Curves.easeOutCubic,
+      builder: (context, progress, _) => SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            CustomPaint(
+              size: Size(size, size),
+              painter: _DonutChartPainter(
+                data: data,
+                strokeWidth: strokeWidth,
+                progress: progress,
+                trackColor: context.cs.surfaceContainerHighest,
+              ),
+            ),
+            if (center != null) center!,
+          ],
         ),
-      );
-    }
-
-    return SizedBox(
-      height: 150,
-      child: Row(
-        children: [
-          SizedBox(
-            width: 150,
-            height: 150,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                PieChart(
-                  PieChartData(
-                    sectionsSpace: 2,
-                    centerSpaceRadius: 45,
-                    sections: data
-                        .map((c) => PieChartSectionData(
-                              value: c.amount,
-                              color: c.category.color,
-                              radius: 26,
-                              showTitle: false,
-                            ))
-                        .toList(),
-                  ),
-                ),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '฿${totalExpense.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                        color: AppColors.blackTie,
-                      ),
-                    ),
-                    const Text(
-                      'รวมรายจ่าย',
-                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: data.take(5).map((c) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 9,
-                        height: 9,
-                        decoration: BoxDecoration(
-                          color: c.category.color,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          c.category.nameTh,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12.5, color: AppColors.blackTie),
-                        ),
-                      ),
-                      Text(
-                        '${c.percent.toStringAsFixed(0)}%',
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.blackTie,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
       ),
     );
+  }
+}
+
+class _DonutChartPainter extends CustomPainter {
+  final Map<ExpenseCategory, double> data;
+  final double strokeWidth;
+  final double progress;
+  final Color trackColor;
+
+  _DonutChartPainter({
+    required this.data,
+    required this.strokeWidth,
+    required this.progress,
+    required this.trackColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Rect.fromLTWH(
+      strokeWidth / 2,
+      strokeWidth / 2,
+      size.width - strokeWidth,
+      size.height - strokeWidth,
+    );
+
+    final total = data.values.fold(0.0, (sum, v) => sum + v);
+
+    // Track ring — also the empty state.
+    canvas.drawArc(
+      rect,
+      0,
+      2 * math.pi,
+      false,
+      Paint()
+        ..color = trackColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth,
+    );
+
+    if (total <= 0) return;
+
+    const gap = 0.05; // visual gap between segments, in radians
+    double startAngle = -math.pi / 2; // 12 o'clock
+
+    for (final entry in data.entries) {
+      if (entry.value <= 0) continue;
+      final fraction = entry.value / total;
+      final sweep = math.max(0.0, fraction * 2 * math.pi - gap) * progress;
+      if (sweep <= 0) continue;
+
+      canvas.drawArc(
+        rect,
+        startAngle,
+        sweep,
+        false,
+        Paint()
+          ..shader = SweepGradient(
+            colors: [
+              entry.key.color,
+              Color.lerp(entry.key.color, AppColors.ink, 0.22)!,
+            ],
+            startAngle: startAngle,
+            endAngle: startAngle + sweep,
+            transform: GradientRotation(startAngle),
+          ).createShader(rect)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = strokeWidth
+          ..strokeCap = StrokeCap.round,
+      );
+
+      startAngle += fraction * 2 * math.pi;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DonutChartPainter old) {
+    return old.progress != progress ||
+        old.strokeWidth != strokeWidth ||
+        old.trackColor != trackColor ||
+        !mapEquals(old.data, data);
   }
 }
