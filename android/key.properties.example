@@ -1,0 +1,6 @@
+# Copy to android/key.properties and fill in with your own keystore details.
+# This file is a template; key.properties itself is git-ignored.
+storePassword=<the password you chose for the keystore>
+keyPassword=<the password you chose for the key>
+keyAlias=upload
+storeFile=C:/Users/<you>/keys/luxury-finance-upload.jks

@@ -224,7 +224,12 @@ class _HeroBalanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final balance = provider.totalSavedSelectedMonth;
+    final hasIncome = provider.hasIncome;
+    // Without an income on file, "money left" would just be the spending as a
+    // negative number, so show the spending itself and offer to fix it.
+    final headline = hasIncome
+        ? provider.totalSavedSelectedMonth
+        : provider.totalExpenseSelectedMonth;
     final change = provider.monthOverMonthChangePercent;
     final spentLess = change <= 0;
 
@@ -264,12 +269,15 @@ class _HeroBalanceCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Flexible(
+                  Flexible(
                     child: Text(
-                      'เงินเหลือใช้',
+                      hasIncome ? 'เงินเหลือใช้' : 'ใช้ไปเดือนนี้',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white70, fontSize: 13.5),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13.5,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -297,7 +305,7 @@ class _HeroBalanceCard extends StatelessWidget {
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
                       child: AnimatedAmount(
-                        value: balance,
+                        value: headline,
                         hidden: hidden,
                         style: const TextStyle(
                           color: Colors.white,
@@ -348,15 +356,22 @@ class _HeroBalanceCard extends StatelessWidget {
               const SizedBox(height: 14),
               Row(
                 children: [
-                  Flexible(
-                    child: _HeroMiniStat(
-                      icon: Icons.south_west_rounded,
-                      label: 'รายรับ',
-                      value: provider.totalIncomeSelectedMonth,
-                      hidden: hidden,
+                  if (hasIncome) ...[
+                    Flexible(
+                      child: _HeroMiniStat(
+                        icon: Icons.south_west_rounded,
+                        label: 'รายรับ',
+                        value: provider.totalIncomeSelectedMonth,
+                        hidden: hidden,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
+                    const SizedBox(width: 16),
+                  ] else ...[
+                    Flexible(
+                      child: _SetIncomeButton(provider: provider),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
                   Flexible(
                     child: _HeroMiniStat(
                       icon: Icons.north_east_rounded,
@@ -393,6 +408,50 @@ class _HeroBalanceCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SetIncomeButton extends StatelessWidget {
+  final FinanceProvider provider;
+  const _SetIncomeButton({required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => showEditNumberDialog(
+        context,
+        title: 'รายรับต่อเดือน',
+        initialValue: 0,
+        onSave: provider.setMonthlyIncome,
+      ),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.add_rounded, size: 15, color: Colors.white),
+            SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                'ตั้งรายรับต่อเดือน',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

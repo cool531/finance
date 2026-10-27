@@ -11,6 +11,7 @@ import 'package:luxury_finance_app/GoalsScreen.dart';
 import 'package:luxury_finance_app/HomeScreen.dart';
 import 'package:luxury_finance_app/MainNavigation.dart';
 import 'package:luxury_finance_app/finance_provider.dart';
+import 'package:luxury_finance_app/onboarding_screen.dart';
 import 'package:luxury_finance_app/report_screen.dart';
 import 'package:luxury_finance_app/settings_screen.dart';
 import 'package:luxury_finance_app/theme_controller.dart';
@@ -79,6 +80,10 @@ void main() {
 
     testWidgets('main navigation renders ($name)', (tester) async {
       await pumpScreen(tester, const MainNavigation(), brightness);
+    });
+
+    testWidgets('onboarding renders ($name)', (tester) async {
+      await pumpScreen(tester, const OnboardingScreen(), brightness);
     });
   }
 }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand colours, kept in step with lib/AppColors.dart -->
+    <color name="brand_navy">#FF123047</color>
+    <color name="splash_background">#FFF4F6F9</color>
+</resources>

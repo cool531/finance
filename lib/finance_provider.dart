@@ -15,14 +15,20 @@ class FinanceProvider extends ChangeNotifier {
   static const _incomeKey = 'fa_monthly_income_v1';
   static const _savingsGoalKey = 'fa_savings_goal_v1';
   static const _userNameKey = 'fa_user_name_v1';
+  static const _onboardedKey = 'fa_onboarded_v1';
 
   bool isLoading = true;
-  String userName = 'Patchanon';
+
+  /// False until the person finishes the welcome flow, which is what decides
+  /// whether the app opens on onboarding or on the dashboard.
+  bool isOnboarded = false;
+
+  String userName = '';
 
   List<Expense> _expenses = [];
   List<Goal> _goals = [];
-  double _monthlyIncome = 32000;
-  double _savingsGoal = 50000;
+  double _monthlyIncome = 0;
+  double _savingsGoal = 0;
 
   /// The month currently being viewed across Home / List / Analysis / Report.
   /// Starts on the current month, then [_init] falls back to the most recent
@@ -48,15 +54,14 @@ class FinanceProvider extends ChangeNotifier {
   Future<void> _init() async {
     final prefs = await SharedPreferences.getInstance();
 
+    // A fresh install starts empty. Sample data only ever arrives because
+    // someone asked for it, from onboarding or from Settings.
     final expensesRaw = prefs.getString(_expensesKey);
     if (expensesRaw != null && expensesRaw.isNotEmpty) {
       final list = jsonDecode(expensesRaw) as List;
       _expenses = list
           .map((e) => Expense.fromJson(e as Map<String, dynamic>))
           .toList();
-    } else {
-      _expenses = _seedExpenses();
-      await _persistExpenses(prefs);
     }
 
     final goalsRaw = prefs.getString(_goalsKey);
@@ -64,14 +69,12 @@ class FinanceProvider extends ChangeNotifier {
       final list = jsonDecode(goalsRaw) as List;
       _goals =
           list.map((g) => Goal.fromJson(g as Map<String, dynamic>)).toList();
-    } else {
-      _goals = _seedGoals();
-      await _persistGoals(prefs);
     }
 
-    _monthlyIncome = prefs.getDouble(_incomeKey) ?? 32000;
-    _savingsGoal = prefs.getDouble(_savingsGoalKey) ?? 50000;
-    userName = prefs.getString(_userNameKey) ?? 'Patchanon';
+    _monthlyIncome = prefs.getDouble(_incomeKey) ?? 0;
+    _savingsGoal = prefs.getDouble(_savingsGoalKey) ?? 0;
+    userName = prefs.getString(_userNameKey) ?? '';
+    isOnboarded = prefs.getBool(_onboardedKey) ?? false;
 
     if (_expensesForMonth(_selectedMonth).isEmpty) {
       final latest = latestMonthWithData;
@@ -586,6 +589,10 @@ class FinanceProvider extends ChangeNotifier {
 
   bool get hasDataForSelectedMonth => expensesForSelectedMonth.isNotEmpty;
 
+  /// True until the person records a monthly income; the dashboard shows what
+  /// they spent rather than a negative "money left" until then.
+  bool get hasIncome => _monthlyIncome > 0;
+
   /// Total spent on each day of the selected month, indexed day 1..n.
   List<double> get dailyTotalsSelectedMonth {
     final daysInMonth =
@@ -684,7 +691,41 @@ class FinanceProvider extends ChangeNotifier {
     return expense;
   }
 
-  /// Wipes expenses and goals and restores the sample data.
+  /// Finishes the welcome flow: stores the person's own numbers and flips the
+  /// app over to the dashboard.
+  Future<void> completeOnboarding({
+    required String name,
+    required double monthlyIncome,
+    required double savingsGoal,
+    bool withSampleData = false,
+  }) async {
+    userName = name.trim().isEmpty ? 'คุณ' : name.trim();
+    // The sample data is a demo of a full month, so it needs figures to be
+    // measured against — otherwise the dashboard opens on a negative balance.
+    _monthlyIncome =
+        (withSampleData && monthlyIncome <= 0) ? 32000 : monthlyIncome;
+    _savingsGoal = (withSampleData && savingsGoal <= 0) ? 50000 : savingsGoal;
+    isOnboarded = true;
+
+    if (withSampleData) {
+      _expenses = _seedExpenses();
+      _goals = _seedGoals();
+      final latest = latestMonthWithData;
+      if (latest != null) _selectedMonth = latest;
+    }
+
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_userNameKey, userName);
+    await prefs.setDouble(_incomeKey, _monthlyIncome);
+    await prefs.setDouble(_savingsGoalKey, _savingsGoal);
+    await prefs.setBool(_onboardedKey, true);
+    await _persistExpenses(prefs);
+    await _persistGoals(prefs);
+  }
+
+  /// Wipes expenses and goals and loads the sample data.
   Future<void> restoreSampleData() async {
     _expenses = _seedExpenses();
     _goals = _seedGoals();
@@ -699,6 +740,7 @@ class FinanceProvider extends ChangeNotifier {
   Future<void> clearAllData() async {
     _expenses = [];
     _goals = [];
+    _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
     notifyListeners();
     await _persistExpenses();
     await _persistGoals();

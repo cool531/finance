@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'AppColors.dart';
+import 'app_info.dart';
 import 'HomeScreen.dart' show showEditNumberDialog, showEditTextDialog;
 import 'common_widgets.dart';
 import 'finance_provider.dart';
@@ -142,6 +143,28 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 22),
+          const SectionHeader(title: 'เกี่ยวกับ'),
+          const SizedBox(height: 10),
+          AppCard(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              children: [
+                _SettingRow(
+                  icon: Icons.info_rounded,
+                  title: 'เวอร์ชัน',
+                  value: appVersionLabel,
+                  onTap: () => showAboutDialog(
+                    context: context,
+                    applicationName: appName,
+                    applicationVersion: appVersionLabel,
+                    applicationLegalese:
+                        'แอปบันทึกรายรับ-รายจ่ายที่เก็บข้อมูลไว้ในเครื่องของคุณเท่านั้น',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           AppCard(
             color: context.cs.surfaceContainer,
             child: Row(
